@@ -1,0 +1,20 @@
+# Fichiers d'environnement
+.env
+.env.*
+
+# Fichiers de build
+/bin
+/dist
+
+# Fichiers de logs
+*.log
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers IDE
+.idea/
+.vscode/
+*.swp
+*.swo 

@@ -61,7 +61,7 @@ func main() {
 
 	// Configuration CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"https://codebynayru.com", "http://localhost:3000"},
+		AllowedOrigins:   []string{"https://codebynayru.com", "http://localhost:8080, http://localhost:4321"},
 		AllowedMethods:   []string{"POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: true,
@@ -108,23 +108,38 @@ func handleContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Envoi de l'email via Mailjet
+	if err := SendMailJetEmail(form); err != nil {
+		log.Printf("Erreur lors de l'envoi de l'email: %v", err)
+		sendResponse(w, false, "Erreur lors de l'envoi du message", http.StatusInternalServerError)
+		return
+	}
+
+	sendResponse(w, true, "Message envoyé avec succès", http.StatusOK)
+}
+
+func SendMailJetEmail(form ContactForm) error {
 	// Configuration de Mailjet
 	mailjetClient := mailjet.NewMailjetClient(
-		os.Getenv("MAILJET_API_KEY"),
-		os.Getenv("MAILJET_API_SECRET"),
+		os.Getenv("MJ_APIKEY_PUBLIC"),
+		os.Getenv("MJ_APIKEY_PRIVATE"),
 	)
+
+	log.Printf("Tentative d'envoi d'email avec les clés API Mailjet : Public=%s, Private=%s",
+		os.Getenv("MJ_APIKEY_PUBLIC")[:8]+"...",
+		os.Getenv("MJ_APIKEY_PRIVATE")[:8]+"...")
 
 	// Préparation de l'email
 	messagesInfo := []mailjet.InfoMessagesV31{
 		{
 			From: &mailjet.RecipientV31{
-				Email: "contact@codebynayru.com",
+				Email: "rpina.pro@gmail.com",
 				Name:  "Code by Nayru",
 			},
 			To: &mailjet.RecipientsV31{
 				mailjet.RecipientV31{
 					Email: "rpina.pro@gmail.com",
-					Name:  "Ryan Pina",
+					Name:  "Ryan PINA-SILASSE",
 				},
 			},
 			Subject:  "Nouveau message de contact - Code by Nayru",
@@ -133,16 +148,26 @@ func handleContact(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	log.Printf("Envoi d'email à rpina.pro@gmail.com avec le sujet : %s",
+		messagesInfo[0].Subject)
+
 	// Envoi de l'email
 	messages := mailjet.MessagesV31{Info: messagesInfo}
-	_, err := mailjetClient.SendMailV31(&messages)
+	response, err := mailjetClient.SendMailV31(&messages)
+
 	if err != nil {
-		log.Printf("Erreur lors de l'envoi de l'email: %v", err)
-		sendResponse(w, false, "Erreur lors de l'envoi du message", http.StatusInternalServerError)
-		return
+		log.Printf("Erreur Mailjet : %v", err)
+		return err
 	}
 
-	sendResponse(w, true, "Message envoyé avec succès", http.StatusOK)
+	// Log détaillé de la réponse Mailjet
+	log.Printf("Réponse Mailjet complète : %+v", response)
+	if len(response.ResultsV31) > 0 {
+		log.Printf("Status: %d", response.ResultsV31[0].Status)
+		log.Printf("To: %s", response.ResultsV31[0].To)
+	}
+
+	return nil
 }
 
 func formatEmailText(form ContactForm) string {
@@ -155,11 +180,30 @@ Message: ` + form.Message
 
 func formatEmailHTML(form ContactForm) string {
 	return `
-		<h2>Nouveau message de contact</h2>
-		<p><strong>Nom:</strong> ` + form.Name + `</p>
-		<p><strong>Email:</strong> ` + form.Email + `</p>
-		<p><strong>Message:</strong></p>
-		<p>` + form.Message + `</p>
+		<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+			<h2 style="color: #4a5568; margin-bottom: 20px;">Nouveau message de contact</h2>
+			
+			<div style="margin-bottom: 15px;">
+				<strong style="color: #2d3748;">Nom:</strong>
+				<p style="margin: 5px 0; color: #4a5568;">` + form.Name + `</p>
+			</div>
+			
+			<div style="margin-bottom: 15px;">
+				<strong style="color: #2d3748;">Email:</strong>
+				<p style="margin: 5px 0; color: #4a5568;">` + form.Email + `</p>
+			</div>
+			
+			<div style="margin-bottom: 15px;">
+				<strong style="color: #2d3748;">Message:</strong>
+				<p style="margin: 5px 0; color: #4a5568; white-space: pre-wrap;">` + form.Message + `</p>
+			</div>
+			
+			<hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+			
+			<p style="color: #718096; font-size: 12px; margin: 0;">
+				Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
+			</p>
+		</div>
 	`
 }
 
