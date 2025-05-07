@@ -1,10 +1,15 @@
 # Fichiers d'environnement
 .env
-.env.*
+.env.local
+.env.*.local
 
 # Fichiers de build
 /bin
 /dist
+
+# Fichiers de dépendances
+/vendor
+/go.sum
 
 # Fichiers de logs
 *.log
