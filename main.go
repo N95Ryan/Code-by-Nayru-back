@@ -74,22 +74,92 @@ func (rl *RateLimiter) isAllowed(ip string) bool {
 	return true
 }
 
+// Configuration CORS sécurisée
+func setupCORS() *cors.Cors {
+	// Origines autorisées
+	allowedOrigins := []string{
+		"https://codebynayru.com", // Production
+		"http://localhost:4321",   // Développement local
+		"https://*.vercel.app",    // Prévisualisation Vercel
+	}
+
+	// En production, on autorise aussi l'origine Railway
+	if os.Getenv("ENV") == "production" {
+		allowedOrigins = append(allowedOrigins, "https://*.railway.app")
+	}
+
+	// Configuration CORS
+	return cors.New(cors.Options{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{
+			http.MethodGet,     // Pour les requêtes de vérification
+			http.MethodPost,    // Pour l'envoi du formulaire
+			http.MethodOptions, // Pour les requêtes préflight
+		},
+		AllowedHeaders: []string{
+			"Content-Type",
+			"Authorization",
+			"X-Requested-With",
+			"Accept",
+			"Origin",
+		},
+		ExposedHeaders: []string{
+			"Content-Length",
+			"Content-Type",
+		},
+		AllowCredentials: true,
+		MaxAge:           300, // 5 minutes
+		Debug:            os.Getenv("ENV") != "production",
+	})
+}
+
+// Middleware pour logger les requêtes CORS
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Log des informations de la requête
+		log.Printf("Requête reçue - Méthode: %s, Origine: %s, Chemin: %s",
+			r.Method,
+			r.Header.Get("Origin"),
+			r.URL.Path,
+		)
+
+		// Gestion des requêtes OPTIONS
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
+			w.Header().Set("Access-Control-Max-Age", "300")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Chargement des variables d'environnement
 	if err := godotenv.Load(); err != nil {
 		log.Println("Fichier .env non trouvé, utilisation des variables d'environnement système")
 	}
 
+	// Définition de l'environnement
+	if os.Getenv("ENV") == "" {
+		os.Setenv("ENV", "development")
+	}
+
 	// Configuration CORS
 	c := setupCORS()
 
-	// Configuration du rate limiter
-	limiter := NewRateLimiter()
-
 	// Configuration des routes
 	mux := http.NewServeMux()
+
+	// Application du middleware CORS
+	handler := corsMiddleware(c.Handler(mux))
+
+	// Configuration des routes
 	mux.HandleFunc("/api/contact", func(w http.ResponseWriter, r *http.Request) {
-		handleContact(w, r, limiter)
+		handleContact(w, r, NewRateLimiter())
 	})
 
 	// Démarrage du serveur
@@ -98,8 +168,7 @@ func main() {
 		port = "8080"
 	}
 
-	handler := c.Handler(mux)
-	log.Printf("Serveur démarré sur le port %s", port)
+	log.Printf("Serveur démarré sur le port %s en mode %s", port, os.Getenv("ENV"))
 	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
 
@@ -246,31 +315,5 @@ func sendResponse(w http.ResponseWriter, success bool, message string, status in
 	json.NewEncoder(w).Encode(Response{
 		Success: success,
 		Message: message,
-	})
-}
-
-// Configuration CORS sécurisée
-func setupCORS() *cors.Cors {
-	return cors.New(cors.Options{
-		AllowedOrigins: []string{
-			"https://codebynayru.com",
-			"http://localhost:4321",
-			"https://*.vercel.app",
-		},
-		AllowedMethods: []string{
-			http.MethodPost,
-			http.MethodOptions,
-		},
-		AllowedHeaders: []string{
-			"Content-Type",
-			"Authorization",
-			"X-Requested-With",
-		},
-		ExposedHeaders: []string{
-			"Content-Length",
-		},
-		AllowCredentials: true,
-		MaxAge:           300, // 5 minutes
-		Debug:            true,
 	})
 }
