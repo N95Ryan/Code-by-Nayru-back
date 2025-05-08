@@ -78,7 +78,8 @@ func (rl *RateLimiter) isAllowed(ip string) bool {
 func setupCORS() *cors.Cors {
 	return cors.New(cors.Options{
 		AllowedOrigins: []string{
-			"https://codebynayru.com", // Production uniquement
+			"https://codebynayru.com",
+			"https://www.codebynayru.com",
 		},
 		AllowedMethods: []string{
 			http.MethodGet,
@@ -88,13 +89,15 @@ func setupCORS() *cors.Cors {
 		AllowedHeaders: []string{
 			"Content-Type",
 			"Origin",
+			"Accept",
 		},
 		ExposedHeaders: []string{
 			"Content-Length",
+			"Content-Type",
 		},
 		AllowCredentials: true,
-		MaxAge:           300, // 5 minutes
-		Debug:            os.Getenv("ENV") != "production",
+		MaxAge:           300,  // 5 minutes
+		Debug:            true, // Activé pour le débogage
 	})
 }
 
@@ -102,15 +105,25 @@ func setupCORS() *cors.Cors {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Log des informations de la requête
-		log.Printf("Requête reçue - Méthode: %s, Origine: %s, Chemin: %s",
+		log.Printf("Requête reçue - Méthode: %s, Origine: %s, Chemin: %s, Headers: %v",
 			r.Method,
 			r.Header.Get("Origin"),
 			r.URL.Path,
+			r.Header,
 		)
 
 		// Vérification de l'origine
 		origin := r.Header.Get("Origin")
-		if origin != "" && origin != "https://codebynayru.com" {
+		allowedOrigins := []string{"https://codebynayru.com", "https://www.codebynayru.com"}
+		isAllowed := false
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				isAllowed = true
+				break
+			}
+		}
+
+		if origin != "" && !isAllowed {
 			log.Printf("Origine non autorisée: %s", origin)
 			http.Error(w, "Origine non autorisée", http.StatusForbidden)
 			return
@@ -118,9 +131,10 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		// Gestion des requêtes OPTIONS
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Origin", "https://codebynayru.com")
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Origin, Accept")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Max-Age", "300")
 			w.WriteHeader(http.StatusOK)
 			return
