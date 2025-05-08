@@ -29,10 +29,30 @@ type Response struct {
 type RateLimiter struct {
 	mu       sync.Mutex
 	requests map[string]time.Time
+	cleanup  *time.Ticker
 }
 
-var limiter = RateLimiter{
-	requests: make(map[string]time.Time),
+func NewRateLimiter() *RateLimiter {
+	rl := &RateLimiter{
+		requests: make(map[string]time.Time),
+		cleanup:  time.NewTicker(1 * time.Hour),
+	}
+
+	go rl.cleanupLoop()
+	return rl
+}
+
+func (rl *RateLimiter) cleanupLoop() {
+	for range rl.cleanup.C {
+		rl.mu.Lock()
+		now := time.Now()
+		for ip, lastRequest := range rl.requests {
+			if now.Sub(lastRequest) > 24*time.Hour {
+				delete(rl.requests, ip)
+			}
+		}
+		rl.mu.Unlock()
+	}
 }
 
 func (rl *RateLimiter) isAllowed(ip string) bool {
@@ -61,22 +81,16 @@ func main() {
 	}
 
 	// Configuration CORS
-	c := cors.New(cors.Options{
-		AllowedOrigins: []string{
-			"https://codebynayru.com",
-			"http://localhost:8080",
-			"http://localhost:4321",
-			"https://*.vercel.app",
-		},
-		AllowedMethods:   []string{"POST", "OPTIONS", "GET"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		AllowCredentials: true,
-		Debug:            true,
-	})
+	c := setupCORS()
+
+	// Configuration du rate limiter
+	limiter := NewRateLimiter()
 
 	// Configuration des routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/contact", handleContact)
+	mux.HandleFunc("/api/contact", func(w http.ResponseWriter, r *http.Request) {
+		handleContact(w, r, limiter)
+	})
 
 	// Démarrage du serveur
 	port := os.Getenv("PORT")
@@ -89,7 +103,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
 
-func handleContact(w http.ResponseWriter, r *http.Request) {
+func handleContact(w http.ResponseWriter, r *http.Request, limiter *RateLimiter) {
 	log.Printf("Nouvelle requête reçue - Méthode: %s, IP: %s", r.Method, r.RemoteAddr)
 
 	if r.Method != http.MethodPost {
@@ -187,40 +201,43 @@ func SendMailJetEmail(form ContactForm) error {
 }
 
 func formatEmailText(form ContactForm) string {
-	return `Nouveau message de contact
-
-Nom: ` + form.Name + `
-Email: ` + form.Email + `
-Message: ` + form.Message
+	return fmt.Sprintf("Nom: %s\nEmail: %s\nMessage:\n%s", form.Name, form.Email, form.Message)
 }
 
 func formatEmailHTML(form ContactForm) string {
-	return `
-		<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-			<h2 style="color: #4a5568; margin-bottom: 20px;">Nouveau message de contact</h2>
-			
-			<div style="margin-bottom: 15px;">
-				<strong style="color: #2d3748;">Nom:</strong>
-				<p style="margin: 5px 0; color: #4a5568;">` + form.Name + `</p>
-			</div>
-			
-			<div style="margin-bottom: 15px;">
-				<strong style="color: #2d3748;">Email:</strong>
-				<p style="margin: 5px 0; color: #4a5568;">` + form.Email + `</p>
-			</div>
-			
-			<div style="margin-bottom: 15px;">
-				<strong style="color: #2d3748;">Message:</strong>
-				<p style="margin: 5px 0; color: #4a5568; white-space: pre-wrap;">` + form.Message + `</p>
-			</div>
-			
-			<hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-			
-			<p style="color: #718096; font-size: 12px; margin: 0;">
-				Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
-			</p>
-		</div>
-	`
+	return fmt.Sprintf(`
+		<html>
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>Nouveau message de contact</title>
+			</head>
+			<body style="font-family:Arial, sans-serif; color:#333; font-size:16px; line-height:1.5; padding:20px; max-width:600px; margin:0 auto;">
+				<div style="background-color:#f8f9fa; padding:20px; border-radius:8px; border:1px solid #e9ecef;">
+					<h2 style="color:#2d3748; margin-bottom:20px; font-size:24px;">Nouveau message de contact</h2>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Nom :</strong> %s</p>
+					</div>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Email :</strong> %s</p>
+					</div>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Message :</strong></p>
+						<p style="margin:5px 0; white-space:pre-wrap;">%s</p>
+					</div>
+					
+					<hr style="border:none; border-top:1px solid #e9ecef; margin:20px 0;">
+					
+					<p style="color:#718096; font-size:12px; margin:0;">
+						Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
+					</p>
+				</div>
+			</body>
+		</html>
+	`, form.Name, form.Email, form.Message)
 }
 
 func sendResponse(w http.ResponseWriter, success bool, message string, status int) {
@@ -229,5 +246,31 @@ func sendResponse(w http.ResponseWriter, success bool, message string, status in
 	json.NewEncoder(w).Encode(Response{
 		Success: success,
 		Message: message,
+	})
+}
+
+// Configuration CORS sécurisée
+func setupCORS() *cors.Cors {
+	return cors.New(cors.Options{
+		AllowedOrigins: []string{
+			"https://codebynayru.com",
+			"http://localhost:4321",
+			"https://*.vercel.app",
+		},
+		AllowedMethods: []string{
+			http.MethodPost,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{
+			"Content-Type",
+			"Authorization",
+			"X-Requested-With",
+		},
+		ExposedHeaders: []string{
+			"Content-Length",
+		},
+		AllowCredentials: true,
+		MaxAge:           300, // 5 minutes
+		Debug:            true,
 	})
 }
