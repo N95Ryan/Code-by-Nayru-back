@@ -1,17 +1,20 @@
 # Fichiers d'environnement
 .env
-.env.local
-.env.*.local
+.env.*
 
-# Fichiers de build
-/bin
-/dist
+# Fichiers de build et dépendances
+/vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Fichiers de dépendances
-/vendor
-/go.sum
+# Fichiers de test
+*.test
+*.out
 
-# Fichiers de logs
+# Fichiers de log
 *.log
 
 # Fichiers système
