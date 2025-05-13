@@ -25,4 +25,34 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+*.swo
+.cursorrules
+
+# Fichiers d'environnement
+.env
+.env.*
+
+# Fichiers de build et dépendances
+/vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Fichiers de test
+*.test
+*.out
+
+# Fichiers de log
+*.log
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers IDE
+.idea/
+.vscode/
+*.swp
 *.swo 

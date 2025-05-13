@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -183,6 +184,7 @@ func main() {
 
 func handleContact(w http.ResponseWriter, r *http.Request, limiter *RateLimiter) {
 	log.Printf("Nouvelle requête reçue - Méthode: %s, IP: %s", r.Method, r.RemoteAddr)
+	log.Printf("Headers reçus: %v", r.Header)
 
 	if r.Method != http.MethodPost {
 		log.Printf("Méthode non autorisée: %s", r.Method)
@@ -198,13 +200,24 @@ func handleContact(w http.ResponseWriter, r *http.Request, limiter *RateLimiter)
 		return
 	}
 
+	// Lecture du corps de la requête
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Erreur de lecture du corps: %v", err)
+		sendResponse(w, false, "Erreur lors de la lecture des données", http.StatusBadRequest)
+		return
+	}
+	log.Printf("Corps de la requête reçu: %s", string(body))
+
 	// Décodage du corps de la requête
 	var form ContactForm
-	if err := json.NewDecoder(r.Body).Decode(&form); err != nil {
+	if err := json.Unmarshal(body, &form); err != nil {
 		log.Printf("Erreur de décodage JSON: %v", err)
 		sendResponse(w, false, "Erreur lors de la lecture des données", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("Données décodées: %+v", form)
 
 	// Validation des champs
 	if err := validateForm(form); err != nil {
@@ -252,6 +265,10 @@ func SendMailJetEmail(form ContactForm) error {
 	apiKeyPublic := os.Getenv("MJ_APIKEY_PUBLIC")
 	apiKeyPrivate := os.Getenv("MJ_APIKEY_PRIVATE")
 
+	log.Printf("Vérification des clés API Mailjet:")
+	log.Printf("MJ_APIKEY_PUBLIC présent: %v", apiKeyPublic != "")
+	log.Printf("MJ_APIKEY_PRIVATE présent: %v", apiKeyPrivate != "")
+
 	if apiKeyPublic == "" || apiKeyPrivate == "" {
 		log.Printf("ERREUR: Clés API Mailjet manquantes")
 		return fmt.Errorf("configuration Mailjet incomplète")
@@ -260,6 +277,8 @@ func SendMailJetEmail(form ContactForm) error {
 	// Validation du format des clés API
 	if len(apiKeyPublic) != 32 || len(apiKeyPrivate) != 32 {
 		log.Printf("ERREUR: Format des clés API Mailjet invalide")
+		log.Printf("Longueur MJ_APIKEY_PUBLIC: %d", len(apiKeyPublic))
+		log.Printf("Longueur MJ_APIKEY_PRIVATE: %d", len(apiKeyPrivate))
 		return fmt.Errorf("format des clés API Mailjet invalide")
 	}
 
@@ -317,6 +336,9 @@ func formatEmailText(form ContactForm) string {
 }
 
 func formatEmailHTML(form ContactForm) string {
+	// Remplacer les retours à la ligne par des <br>
+	formattedMessage := strings.ReplaceAll(form.Message, "\n", "<br>")
+
 	if form.Locale == "en" {
 		return fmt.Sprintf(`
 		<html>
@@ -325,32 +347,25 @@ func formatEmailHTML(form ContactForm) string {
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<title>New contact message</title>
 			</head>
-			<body style="font-family:Arial, sans-serif; color:#333; font-size:16px; line-height:1.5; padding:20px; max-width:600px; margin:0 auto;">
-				<div style="background-color:#f8f9fa; padding:20px; border-radius:8px; border:1px solid #e9ecef;">
-					<h2 style="color:#2d3748; margin-bottom:20px; font-size:24px;">New contact message</h2>
-					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Name:</strong> %s</p>
+			<body style="font-family: Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0;">
+				<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+					<div style="margin-bottom: 20px;">
+						<div style="font-weight: bold; margin-bottom: 5px;">From:</div>
+						<div>%s &lt;%s&gt;</div>
 					</div>
 					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Email:</strong> %s</p>
+					<div style="margin-bottom: 20px;">
+						<div style="font-weight: bold; margin-bottom: 5px;">Message:</div>
+						<div style="white-space: pre-wrap;">%s</div>
 					</div>
 					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Message:</strong></p>
-						<p style="margin:5px 0; white-space:pre-wrap;">%s</p>
-					</div>
-					
-					<hr style="border:none; border-top:1px solid #e9ecef; margin:20px 0;">
-					
-					<p style="color:#718096; font-size:12px; margin:0;">
+					<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
 						This message was sent from the Code by Nayru contact form.
-					</p>
+					</div>
 				</div>
 			</body>
 		</html>
-		`, form.Name, form.Email, form.Message)
+		`, form.Name, form.Email, formattedMessage)
 	}
 	return fmt.Sprintf(`
 		<html>
@@ -359,32 +374,25 @@ func formatEmailHTML(form ContactForm) string {
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<title>Nouveau message de contact</title>
 			</head>
-			<body style="font-family:Arial, sans-serif; color:#333; font-size:16px; line-height:1.5; padding:20px; max-width:600px; margin:0 auto;">
-				<div style="background-color:#f8f9fa; padding:20px; border-radius:8px; border:1px solid #e9ecef;">
-					<h2 style="color:#2d3748; margin-bottom:20px; font-size:24px;">Nouveau message de contact</h2>
-					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Nom :</strong> %s</p>
+			<body style="font-family: Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0;">
+				<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+					<div style="margin-bottom: 20px;">
+						<div style="font-weight: bold; margin-bottom: 5px;">De :</div>
+						<div>%s &lt;%s&gt;</div>
 					</div>
 					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Email :</strong> %s</p>
+					<div style="margin-bottom: 20px;">
+						<div style="font-weight: bold; margin-bottom: 5px;">Message :</div>
+						<div style="white-space: pre-wrap;">%s</div>
 					</div>
 					
-					<div style="margin-bottom:15px;">
-						<p style="margin:5px 0;"><strong style="color:#2d3748;">Message :</strong></p>
-						<p style="margin:5px 0; white-space:pre-wrap;">%s</p>
-					</div>
-					
-					<hr style="border:none; border-top:1px solid #e9ecef; margin:20px 0;">
-					
-					<p style="color:#718096; font-size:12px; margin:0;">
+					<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
 						Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
-					</p>
+					</div>
 				</div>
 			</body>
 		</html>
-	`, form.Name, form.Email, form.Message)
+	`, form.Name, form.Email, formattedMessage)
 }
 
 func sendResponse(w http.ResponseWriter, success bool, message string, status int) {
