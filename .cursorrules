@@ -1,0 +1,71 @@
+** Language & Communication **
+
+- Toujours répondre en français, même si la question est en anglais
+- Suivre la documentation officielle de Go et des bibliothèques utilisées
+
+** Go **
+
+- Suivre les conventions de nommage Go (camelCase pour les variables, PascalCase pour les exports)
+- Utiliser les interfaces pour la découverte de code et la testabilité
+- Préférer la composition à l'héritage
+- Éviter les variables globales
+- Utiliser les contextes pour la gestion des timeouts et des annulations
+- Gérer proprement les erreurs avec des messages explicites
+- Documenter les fonctions exportées avec des commentaires godoc
+
+** Architecture & Structure **
+
+- Organiser le code en packages logiques (handlers, models, services, etc.)
+- Séparer la logique métier des handlers HTTP
+- Utiliser des middlewares pour la logique transversale
+- Implémenter une gestion propre des configurations via les variables d'environnement
+- Suivre le principe de responsabilité unique
+
+** Sécurité **
+
+- Valider toutes les entrées utilisateur
+- Implémenter une protection CORS appropriée
+- Utiliser des rate limiters pour les endpoints sensibles
+- Ne jamais exposer d'informations sensibles dans les logs
+- Utiliser des variables d'environnement pour les secrets
+- Implémenter une gestion sécurisée des sessions si nécessaire
+
+** Tests **
+
+- Écrire des tests unitaires pour la logique métier
+- Utiliser des mocks pour les dépendances externes
+- Maintenir une bonne couverture de tests
+- Suivre le pattern AAA (Arrange, Act, Assert)
+- Utiliser les table-driven tests quand approprié
+
+** Performance **
+
+- Utiliser des pools d'objets pour les allocations fréquentes
+- Implémenter du caching quand nécessaire
+- Optimiser les requêtes de base de données
+- Utiliser des goroutines de manière responsable
+- Surveiller l'utilisation de la mémoire
+
+** Logging & Monitoring **
+
+- Utiliser des niveaux de log appropriés (DEBUG, INFO, ERROR)
+- Structurer les logs pour faciliter leur analyse
+- Inclure des identifiants de corrélation dans les logs
+- Implémenter des métriques pour le monitoring
+- Documenter les erreurs de manière détaillée
+
+** Naming Conventions **
+
+- Utiliser des noms descriptifs et en anglais
+- Suivre les conventions Go pour les noms de packages
+- Préfixer les interfaces avec 'I' si nécessaire
+- Utiliser des suffixes explicites pour les types (Handler, Service, etc.)
+- Nommer les tests avec le suffixe \_test.go
+
+** Commit Message Format **
+
+- Suivre la spécification Conventional Commits
+- Inclure un scope quand applicable (api, auth, db, etc.)
+- Utiliser l'impératif dans le message
+- Limiter la ligne de résumé à 72 caractères
+- Lors de la saisie de "Commit:", générer un message formaté en conséquence
