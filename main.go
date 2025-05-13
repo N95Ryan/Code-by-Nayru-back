@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ type ContactForm struct {
 	Name    string `json:"name"`
 	Email   string `json:"email"`
 	Message string `json:"message"`
+	Locale  string `json:"locale"`
 }
 
 type Response struct {
@@ -204,12 +206,10 @@ func handleContact(w http.ResponseWriter, r *http.Request, limiter *RateLimiter)
 		return
 	}
 
-	log.Printf("Données reçues - Nom: %s, Email: %s, Message: %s", form.Name, form.Email, form.Message)
-
 	// Validation des champs
-	if form.Name == "" || form.Email == "" || form.Message == "" {
-		log.Printf("Champs manquants dans la requête")
-		sendResponse(w, false, "Tous les champs sont obligatoires", http.StatusBadRequest)
+	if err := validateForm(form); err != nil {
+		log.Printf("Erreur de validation: %v", err)
+		sendResponse(w, false, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -223,6 +223,30 @@ func handleContact(w http.ResponseWriter, r *http.Request, limiter *RateLimiter)
 	sendResponse(w, true, "Message envoyé avec succès", http.StatusOK)
 }
 
+// Nouvelle fonction de validation
+func validateForm(form ContactForm) error {
+	if form.Name == "" {
+		return fmt.Errorf("le nom est obligatoire")
+	}
+	if len(form.Name) > 100 {
+		return fmt.Errorf("le nom ne doit pas dépasser 100 caractères")
+	}
+	if form.Email == "" {
+		return fmt.Errorf("l'email est obligatoire")
+	}
+	// Validation basique du format email
+	if !strings.Contains(form.Email, "@") || !strings.Contains(form.Email, ".") {
+		return fmt.Errorf("format d'email invalide")
+	}
+	if form.Message == "" {
+		return fmt.Errorf("le message est obligatoire")
+	}
+	if len(form.Message) > 1000 {
+		return fmt.Errorf("le message ne doit pas dépasser 1000 caractères")
+	}
+	return nil
+}
+
 func SendMailJetEmail(form ContactForm) error {
 	// Configuration de Mailjet
 	apiKeyPublic := os.Getenv("MJ_APIKEY_PUBLIC")
@@ -233,10 +257,19 @@ func SendMailJetEmail(form ContactForm) error {
 		return fmt.Errorf("configuration Mailjet incomplète")
 	}
 
+	// Validation du format des clés API
+	if len(apiKeyPublic) != 32 || len(apiKeyPrivate) != 32 {
+		log.Printf("ERREUR: Format des clés API Mailjet invalide")
+		return fmt.Errorf("format des clés API Mailjet invalide")
+	}
+
 	mailjetClient := mailjet.NewMailjetClient(apiKeyPublic, apiKeyPrivate)
 
-	log.Printf("Configuration Mailjet - Public Key: %s...", apiKeyPublic[:8])
-	log.Printf("Configuration Mailjet - Private Key: %s...", apiKeyPrivate[:8])
+	// Détermination du sujet en fonction de la locale
+	subject := "Nouveau message de contact - Code by Nayru"
+	if form.Locale == "en" {
+		subject = "New contact message - Code by Nayru"
+	}
 
 	// Préparation de l'email
 	messagesInfo := []mailjet.InfoMessagesV31{
@@ -251,13 +284,13 @@ func SendMailJetEmail(form ContactForm) error {
 					Name:  "Ryan PINA-SILASSE",
 				},
 			},
-			Subject:  "Nouveau message de contact - Code by Nayru",
+			Subject:  subject,
 			TextPart: formatEmailText(form),
 			HTMLPart: formatEmailHTML(form),
 		},
 	}
 
-	log.Printf("Tentative d'envoi d'email à rpina.pro@gmail.com")
+	log.Printf("Tentative d'envoi d'email à rpina.pro@gmail.com (Locale: %s)", form.Locale)
 
 	// Envoi de l'email
 	messages := mailjet.MessagesV31{Info: messagesInfo}
@@ -277,10 +310,48 @@ func SendMailJetEmail(form ContactForm) error {
 }
 
 func formatEmailText(form ContactForm) string {
+	if form.Locale == "en" {
+		return fmt.Sprintf("Name: %s\nEmail: %s\nMessage:\n%s", form.Name, form.Email, form.Message)
+	}
 	return fmt.Sprintf("Nom: %s\nEmail: %s\nMessage:\n%s", form.Name, form.Email, form.Message)
 }
 
 func formatEmailHTML(form ContactForm) string {
+	if form.Locale == "en" {
+		return fmt.Sprintf(`
+		<html>
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>New contact message</title>
+			</head>
+			<body style="font-family:Arial, sans-serif; color:#333; font-size:16px; line-height:1.5; padding:20px; max-width:600px; margin:0 auto;">
+				<div style="background-color:#f8f9fa; padding:20px; border-radius:8px; border:1px solid #e9ecef;">
+					<h2 style="color:#2d3748; margin-bottom:20px; font-size:24px;">New contact message</h2>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Name:</strong> %s</p>
+					</div>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Email:</strong> %s</p>
+					</div>
+					
+					<div style="margin-bottom:15px;">
+						<p style="margin:5px 0;"><strong style="color:#2d3748;">Message:</strong></p>
+						<p style="margin:5px 0; white-space:pre-wrap;">%s</p>
+					</div>
+					
+					<hr style="border:none; border-top:1px solid #e9ecef; margin:20px 0;">
+					
+					<p style="color:#718096; font-size:12px; margin:0;">
+						This message was sent from the Code by Nayru contact form.
+					</p>
+				</div>
+			</body>
+		</html>
+		`, form.Name, form.Email, form.Message)
+	}
 	return fmt.Sprintf(`
 		<html>
 			<head>
