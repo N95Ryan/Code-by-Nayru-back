@@ -372,14 +372,14 @@ func formatEmailHTML(form ContactForm) string {
 						padding: 0;
 						font-family: Arial, sans-serif;
 						background-color: #f4f4f4;
+						width: 100%;
 					}
 					.container {
-						max-width: 600px;
-						margin: 40px auto;
+						width: 100%;
+						margin: 0;
 						background-color: #ffffff;
 						padding: 24px;
-						border-radius: 8px;
-						box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+						box-sizing: border-box;
 					}
 					h1 {
 						font-size: 24px;
@@ -449,14 +449,14 @@ func formatEmailHTML(form ContactForm) string {
 						padding: 0;
 						font-family: Arial, sans-serif;
 						background-color: #f4f4f4;
+						width: 100%;
 					}
 					.container {
-						max-width: 600px;
-						margin: 40px auto;
+						width: 100%;
+						margin: 0;
 						background-color: #ffffff;
 						padding: 24px;
-						border-radius: 8px;
-						box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+						box-sizing: border-box;
 					}
 					h1 {
 						font-size: 24px;
