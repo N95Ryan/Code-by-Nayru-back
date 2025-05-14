@@ -294,7 +294,7 @@ func SendMailJetEmail(form ContactForm) error {
 	messagesInfo := []mailjet.InfoMessagesV31{
 		{
 			From: &mailjet.RecipientV31{
-				Email: "rpina.pro@gmail.com",
+				Email: "contact@codebynayru.com",
 				Name:  "Code by Nayru",
 			},
 			To: &mailjet.RecipientsV31{
@@ -309,7 +309,7 @@ func SendMailJetEmail(form ContactForm) error {
 		},
 	}
 
-	log.Printf("Tentative d'envoi d'email à rpina.pro@gmail.com (Locale: %s)", form.Locale)
+	log.Printf("Tentative d'envoi d'email à nouvelle-adresse-destinataire@votre-domaine.com (Locale: %s)", form.Locale)
 
 	// Envoi de l'email
 	messages := mailjet.MessagesV31{Info: messagesInfo}
