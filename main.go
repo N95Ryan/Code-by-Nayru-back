@@ -147,6 +147,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+type EmailTemplate struct {
+	Name    string
+	Email   string
+	Message string
+	Subject string
+	Locale  string
+}
+
 func main() {
 	// Chargement des variables d'environnement
 	if err := godotenv.Load(); err != nil {
@@ -285,10 +293,7 @@ func SendMailJetEmail(form ContactForm) error {
 	mailjetClient := mailjet.NewMailjetClient(apiKeyPublic, apiKeyPrivate)
 
 	// Détermination du sujet en fonction de la locale
-	subject := "Nouveau message de contact - Code by Nayru"
-	if form.Locale == "en" {
-		subject = "New contact message - Code by Nayru"
-	}
+	subject := getEmailSubject(form.Locale)
 
 	// Préparation de l'email
 	messagesInfo := []mailjet.InfoMessagesV31{
@@ -328,16 +333,40 @@ func SendMailJetEmail(form ContactForm) error {
 	return nil
 }
 
-func formatEmailText(form ContactForm) string {
-	if form.Locale == "en" {
-		return fmt.Sprintf("Name: %s\nEmail: %s\nMessage:\n%s", form.Name, form.Email, form.Message)
+func getEmailSubject(locale string) string {
+	if locale == "en" {
+		return "New contact message - Code by Nayru"
 	}
-	return fmt.Sprintf("Nom: %s\nEmail: %s\nMessage:\n%s", form.Name, form.Email, form.Message)
+	return "Nouveau message de contact - Code by Nayru"
+}
+
+func formatEmailText(form ContactForm) string {
+	template := EmailTemplate{
+		Name:    form.Name,
+		Email:   form.Email,
+		Message: form.Message,
+		Subject: getEmailSubject(form.Locale),
+		Locale:  form.Locale,
+	}
+
+	if form.Locale == "en" {
+		return fmt.Sprintf("Name: %s\nEmail: %s\nMessage:\n%s", template.Name, template.Email, template.Message)
+	}
+	return fmt.Sprintf("Nom: %s\nEmail: %s\nMessage:\n%s", template.Name, template.Email, template.Message)
 }
 
 func formatEmailHTML(form ContactForm) string {
 	// Remplacer les retours à la ligne par des <br>
 	formattedMessage := strings.ReplaceAll(form.Message, "\n", "<br>")
+
+	// Création du template avec les variables
+	template := EmailTemplate{
+		Name:    form.Name,
+		Email:   form.Email,
+		Message: formattedMessage,
+		Subject: getEmailSubject(form.Locale),
+		Locale:  form.Locale,
+	}
 
 	if form.Locale == "en" {
 		return fmt.Sprintf(`
@@ -345,54 +374,66 @@ func formatEmailHTML(form ContactForm) string {
 			<head>
 				<meta charset="utf-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<title>New contact message</title>
+				<title>%s</title>
 			</head>
-			<body style="font-family: Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0;">
+			<body style="font-family: 'Google Sans', Roboto, Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0; background-color: #f6f8fc;">
 				<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-					<div style="margin-bottom: 20px;">
-						<div style="font-weight: bold; margin-bottom: 5px;">From:</div>
-						<div>%s &lt;%s&gt;</div>
-					</div>
-					
-					<div style="margin-bottom: 20px;">
-						<div style="font-weight: bold; margin-bottom: 5px;">Message:</div>
-						<div style="white-space: pre-wrap;">%s</div>
-					</div>
-					
-					<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
-						This message was sent from the Code by Nayru contact form.
+					<div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); padding: 20px;">
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 16px; font-weight: 500; color: #202124; margin-bottom: 8px;">Subject: %s</div>
+						</div>
+						
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #5f6368; margin-bottom: 4px;">From:</div>
+							<div style="font-size: 14px; color: #202124;">%s &lt;%s&gt;</div>
+						</div>
+						
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #5f6368; margin-bottom: 4px;">Message:</div>
+							<div style="font-size: 14px; color: #202124; white-space: pre-wrap; background-color: #f8f9fa; padding: 12px; border-radius: 4px;">%s</div>
+						</div>
+						
+						<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
+							This message was sent from the Code by Nayru contact form.
+						</div>
 					</div>
 				</div>
 			</body>
 		</html>
-		`, form.Name, form.Email, formattedMessage)
+		`, template.Subject, template.Subject, template.Name, template.Email, template.Message)
 	}
 	return fmt.Sprintf(`
 		<html>
 			<head>
 				<meta charset="utf-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<title>Nouveau message de contact</title>
+				<title>%s</title>
 			</head>
-			<body style="font-family: Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0;">
+			<body style="font-family: 'Google Sans', Roboto, Arial, sans-serif; color: #202124; font-size: 14px; line-height: 1.5; margin: 0; padding: 0; background-color: #f6f8fc;">
 				<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-					<div style="margin-bottom: 20px;">
-						<div style="font-weight: bold; margin-bottom: 5px;">De :</div>
-						<div>%s &lt;%s&gt;</div>
-					</div>
-					
-					<div style="margin-bottom: 20px;">
-						<div style="font-weight: bold; margin-bottom: 5px;">Message :</div>
-						<div style="white-space: pre-wrap;">%s</div>
-					</div>
-					
-					<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
-						Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
+					<div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); padding: 20px;">
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 16px; font-weight: 500; color: #202124; margin-bottom: 8px;">Objet : %s</div>
+						</div>
+						
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #5f6368; margin-bottom: 4px;">De :</div>
+							<div style="font-size: 14px; color: #202124;">%s &lt;%s&gt;</div>
+						</div>
+						
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #5f6368; margin-bottom: 4px;">Message :</div>
+							<div style="font-size: 14px; color: #202124; white-space: pre-wrap; background-color: #f8f9fa; padding: 12px; border-radius: 4px;">%s</div>
+						</div>
+						
+						<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0; color: #5f6368; font-size: 12px;">
+							Ce message a été envoyé depuis le formulaire de contact de Code by Nayru.
+						</div>
 					</div>
 				</div>
 			</body>
 		</html>
-	`, form.Name, form.Email, formattedMessage)
+	`, template.Subject, template.Subject, template.Name, template.Email, template.Message)
 }
 
 func sendResponse(w http.ResponseWriter, success bool, message string, status int) {
