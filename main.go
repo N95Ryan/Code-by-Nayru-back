@@ -421,7 +421,7 @@ func formatEmailHTML(form ContactForm) string {
 					
 					<div class="info-block">
 						<div class="label">From:</div>
-						<div class="value">%s &lt;%s&gt;</div>
+						<div class="value">%s (%s)</div>
 					</div>
 					
 					<div class="info-block">
@@ -498,7 +498,7 @@ func formatEmailHTML(form ContactForm) string {
 					
 					<div class="info-block">
 						<div class="label">De :</div>
-						<div class="value">%s &lt;%s&gt;</div>
+						<div class="value">%s (%s)</div>
 					</div>
 					
 					<div class="info-block">
