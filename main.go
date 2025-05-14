@@ -372,14 +372,14 @@ func formatEmailHTML(form ContactForm) string {
 						padding: 0;
 						font-family: Arial, sans-serif;
 						background-color: #f4f4f4;
-						width: 100%;
 					}
 					.container {
-						width: 100%;
-						margin: 0;
+						max-width: 600px;
+						margin: 40px auto;
 						background-color: #ffffff;
 						padding: 24px;
-						box-sizing: border-box;
+						border-radius: 8px;
+						box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 					}
 					h1 {
 						font-size: 24px;
@@ -417,7 +417,7 @@ func formatEmailHTML(form ContactForm) string {
 			</head>
 			<body>
 				<div class="container">
-					<h1>%s</h1>
+					<h2>%s</h2>
 					
 					<div class="info-block">
 						<div class="label">From:</div>
@@ -449,14 +449,14 @@ func formatEmailHTML(form ContactForm) string {
 						padding: 0;
 						font-family: Arial, sans-serif;
 						background-color: #f4f4f4;
-						width: 100%;
 					}
 					.container {
-						width: 100%;
-						margin: 0;
+						max-width: 600px;
+						margin: 40px auto;
 						background-color: #ffffff;
 						padding: 24px;
-						box-sizing: border-box;
+						border-radius: 8px;
+						box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 					}
 					h1 {
 						font-size: 24px;
@@ -494,7 +494,7 @@ func formatEmailHTML(form ContactForm) string {
 			</head>
 			<body>
 				<div class="container">
-					<h1>%s</h1>
+					<h2>%s</h2>
 					
 					<div class="info-block">
 						<div class="label">De :</div>
